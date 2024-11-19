@@ -33,6 +33,7 @@ class McDonaldsMap extends StatefulWidget {
 
 class _McDonaldsMapState extends State<McDonaldsMap> {
   late GoogleMapController _mapController;
+  final ScrollController _scrollController = ScrollController();
 
   // Define the locations of the McDonald's in Surrey
   final List<McDonaldsLocation> _locations = [
@@ -54,11 +55,41 @@ class _McDonaldsMapState extends State<McDonaldsMap> {
       lng: -122.8395,
       address: '7130 120 St, Surrey, BC V3W 3M8',
     ),
+    McDonaldsLocation(
+      name: 'McDonald\'s Surrey Starbucks',
+      lat: 49.186783508168915,
+      lng: -122.8369779895335,
+      address: '10200 King George Blvd, Surrey, BC V3T 5X5',
+    ),
+    McDonaldsLocation(
+      name: 'McDonald\'s Guildford Bridge',
+      lat: 49.18280035256553,
+      lng: -122.8307981800432,
+      address: '10355 152 St, Surrey, BC V3R 4G3',
+    ),
+    McDonaldsLocation(
+      name: 'McDonald\'s Newton Aux',
+      lat: 49.188129854456626,
+      lng: -122.82444670917819,
+      address: '7130 120 St, Surrey, BC V3W 3M8',
+    ),
   ];
 
-  @override
-  void initState() {
-    super.initState();
+  void _animateToLocation(McDonaldsLocation location) {
+    _mapController.animateCamera(
+      CameraUpdate.newLatLng(LatLng(location.lat, location.lng)),
+    );
+  }
+
+  void _scrollToLocationInList(McDonaldsLocation location) {
+    int index = _locations.indexOf(location);
+    if (index != -1) {
+      _scrollController.animateTo(
+        index * 100.0, // Adjust for item height (100.0 as an estimate)
+        duration: Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   @override
@@ -79,7 +110,8 @@ class _McDonaldsMapState extends State<McDonaldsMap> {
                       position: LatLng(location.lat, location.lng),
                       infoWindow: InfoWindow(title: location.name),
                       onTap: () {
-                        context.read<LocationCubit>().selectLocation(location); // Dispatch the location selection event
+                        context.read<LocationCubit>().selectLocation(location);
+                        _scrollToLocationInList(location);
                       },
                     ))
                 .toSet(),
@@ -87,75 +119,57 @@ class _McDonaldsMapState extends State<McDonaldsMap> {
               _mapController = controller;
             },
           ),
-          // Bottom Card View
-          Positioned(
-            bottom: 10,
-            left: 10,
-            right: 10,
-            child: BlocBuilder<LocationCubit, LocationState>(
-              builder: (context, state) {
-                if (state is LocationSelectedState) {
-                  return Container(
-                    height: 250.0,
-                    child: ListView(
-                      children: [
-                        Card(
+          // Draggable Bottom Sheet
+          DraggableScrollableSheet(
+            initialChildSize: 0.3, // Display halfway initially
+            minChildSize: 0.2,
+            maxChildSize: 0.6,
+            builder: (BuildContext context, ScrollController scrollController) {
+              return Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.only(
+                    topLeft: Radius.circular(16.0),
+                    topRight: Radius.circular(16.0),
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black26,
+                      blurRadius: 10.0,
+                    ),
+                  ],
+                ),
+                child: BlocBuilder<LocationCubit, LocationState>(
+                  builder: (context, state) {
+                    final selectedLocation =
+                        state is LocationSelectedState ? state.location : null;
+                    return ListView.builder(
+                      controller: _scrollController,
+                      itemCount: _locations.length,
+                      itemBuilder: (context, index) {
+                        final location = _locations[index];
+                        final isSelected = location == selectedLocation;
+                        return Card(
+                          color: isSelected ? Colors.blue[50] : Colors.white,
                           elevation: 4.0,
                           child: ListTile(
-                            title: Text(state.location.name),
-                            subtitle: Text(state.location.address),
+                            title: Text(location.name),
+                            subtitle: Text(location.address),
+                            onTap: () {
+                              context
+                                  .read<LocationCubit>()
+                                  .selectLocation(location);
+                              _animateToLocation(location);
+                              _scrollToLocationInList(location);
+                            },
                           ),
-                        ),
-                        ..._locations.map((location) {
-                          return Card(
-                            elevation: 4.0,
-                            child: ListTile(
-                              title: Text(location.name),
-                              subtitle: Text(location.address),
-                              onTap: () {
-                                context.read<LocationCubit>().selectLocation(location);
-                                // Optionally, animate the map camera to the location
-                                _mapController.animateCamera(
-                                  CameraUpdate.newLatLng(
-                                    LatLng(location.lat, location.lng),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        }).toList(),
-                      ],
-                    ),
-                  );
-                } else {
-                  return Container(
-                    height: 250.0,
-                    child: ListView(
-                      children: [
-                        ..._locations.map((location) {
-                          return Card(
-                            elevation: 4.0,
-                            child: ListTile(
-                              title: Text(location.name),
-                              subtitle: Text(location.address),
-                              onTap: () {
-                                context.read<LocationCubit>().selectLocation(location);
-                                // Optionally, animate the map camera to the location
-                                _mapController.animateCamera(
-                                  CameraUpdate.newLatLng(
-                                    LatLng(location.lat, location.lng),
-                                  ),
-                                );
-                              },
-                            ),
-                          );
-                        }).toList(),
-                      ],
-                    ),
-                  );
-                }
-              },
-            ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              );
+            },
           ),
         ],
       ),
